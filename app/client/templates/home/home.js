@@ -58,69 +58,80 @@ function execOnyx(options) {
 
 function successCallback(result) {
     console.log("successCallback(): " + JSON.stringify(result));
-    if (result.hasOwnProperty("imageUri")) {
-        Session.set("imageUri", result.imageUri);
-    }
-    if (result.hasOwnProperty("nfiqScore")) {
-        console.log("nfiqScore: " + result.nfiqScore);
-    }
-    if (result.hasOwnProperty("template")) {
-        console.log("template: " + result.template);
-    }
     console.log("action: ", result.action);
-    if (result.action === Onyx.Action.ENROLL) {
-        if (result.hasOwnProperty("template")) {
-            Meteor.call('onyx/fingerprint/save', {template: result.template}, function (error, result) {
-                if (error) {
-                    console.log("Error saving fingerprint template: ", error);
-                } else {
-                    console.log("Successfully saved fingerprint template.");
-                    swal({
-                        type: "success",
-                        title: "Fingerprint Template Saved"
-                    })
-                }
-            });
-        }
-    }
-    if (result.action === Onyx.Action.TEMPLATE) {
-        if (result.hasOwnProperty("template")) {
-            Meteor.call('onyx/fingerprint/verify', {
-                template: result.template,
-                signInWithOnyx: Session.get("signInWithOnyx")
-            }, function (error, result) {
-                var swalConfig = {};
-                if (error) {
-                    console.log("Error verifying fingerprint template: ", error);
-                    var msg;
-                    if (error.reason) {
-                        msg = error.reason;
-                    } else if (error.message) {
-                        msg = error.message;
+    switch (result.action) {
+        case Onyx.Action.IMAGE:
+            if (result.hasOwnProperty("imageUri")) {
+                Session.set("imageUri", result.imageUri);
+            }
+            break;
+        case Onyx.Action.VERIFY:
+            if (result.hasOwnProperty("nfiqScore")) {
+                console.log("isVerified", result.isVerified);
+                console.log("nfiqScore: " + result.nfiqScore);
+                var type = (result.isVerified ? "success" : "error");
+                var title = (result.isVerified ? "Verified" : "Failed");
+                swal({
+                    type: type,
+                    title: title,
+                    text: "Match score: " + result.nfiqScore
+                });
+            }
+            break;
+        case Onyx.Action.ENROLL:
+            if (result.hasOwnProperty("template")) {
+                Meteor.call('onyx/fingerprint/save', {template: result.template}, function (error, result) {
+                    if (error) {
+                        console.log("Error saving fingerprint template: ", error);
                     } else {
-                        msg = error;
+                        console.log("Successfully saved fingerprint template.");
+                        swal({
+                            type: "success",
+                            title: "Fingerprint Template Saved"
+                        });
                     }
-                    swalConfig.type = "error";
-                    swalConfig.title = "Verify Error";
-                    swalConfig.text = msg;
-                } else {
-                    if (result.isVerified) {
-                        swalConfig.type = "success";
-                        swalConfig.title = "Verified";
-                        swalConfig.text = "Your fingerprint matched!";
-                        if (result.token) {
-                            Meteor.loginWithToken(result.token);
+                });
+            }
+            break;
+        case Onyx.Action.TEMPLATE:
+            if (result.hasOwnProperty("template")) {
+                Meteor.call('onyx/fingerprint/verify', {
+                    template: result.template,
+                    signInWithOnyx: Session.get("signInWithOnyx")
+                }, function (error, result) {
+                    var swalConfig = {};
+                    if (error) {
+                        console.log("Error verifying fingerprint template: ", error);
+                        var msg;
+                        if (error.reason) {
+                            msg = error.reason;
+                        } else if (error.message) {
+                            msg = error.message;
+                        } else {
+                            msg = error;
                         }
-                    } else {
                         swalConfig.type = "error";
-                        swalConfig.title = "Failed";
-                        swalConfig.text = "Your fingerprint did not match!"
+                        swalConfig.title = "Verify Error";
+                        swalConfig.text = msg;
+                    } else {
+                        if (result.isVerified) {
+                            swalConfig.type = "success";
+                            swalConfig.title = "Verified";
+                            swalConfig.text = "Your fingerprint matched!";
+                            if (result.token) {
+                                Meteor.loginWithToken(result.token);
+                            }
+                        } else {
+                            swalConfig.type = "error";
+                            swalConfig.title = "Failed";
+                            swalConfig.text = "Your fingerprint did not match!"
+                        }
+                        swalConfig.text += "\nMatch Score: " + result.score;
                     }
-                    swalConfig.text += "\nMatch Score: " + result.score;
-                }
-                swal(swalConfig);
-            });
-        }
+                    swal(swalConfig);
+                });
+            }
+            break;
     }
 }
 
